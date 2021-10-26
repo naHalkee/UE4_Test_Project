@@ -55,7 +55,7 @@ void AMyProjectCharacter::SpawnNewToy()
 
 void AMyProjectCharacter::ChangeToy()
 {
-	if (CurrentToy == nullptr || CurrentToy->State == EState::Available) return;
+	if (!IsValid(CurrentToy) || CurrentToy->State == EState::Available) return;
 	
 	IndexOFToyType = (IndexOFToyType + 1) % TargetsTemplates.Num();
 	CurrentToy->Destroy();
@@ -65,20 +65,13 @@ void AMyProjectCharacter::ChangeToy()
 
 void AMyProjectCharacter::DropToy()
 {
-	if (CurrentToy == nullptr || CurrentToy->State == EState::Available) return;
+	if (!IsValid(CurrentToy) || CurrentToy->State == EState::Available) return;
 
 	CurrentToy->TargetMesh->SetSimulatePhysics(true);
 	CurrentToy->TargetMesh->AddImpulse(GetActorForwardVector() * 40000);
 	CurrentToy->State = EState::Available;
-}
-
-void AMyProjectCharacter::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-	if (!CurrentToy || CurrentToy->IsPendingKill())
-	{
-		SpawnNewToy();
-	}
+	
+	if(IsValid(GameMode)) GameMode->BroadcastToyAvailable(CurrentToy);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -115,6 +108,11 @@ void AMyProjectCharacter::SetupPlayerInputComponent(class UInputComponent* Playe
 }
 
 
+void AMyProjectCharacter::OnToyDestroyed()
+{
+	SpawnNewToy();
+}
+
 void AMyProjectCharacter::OnResetVR()
 {
 	// If MyProject is added to a project via 'Add Feature' in the Unreal Editor the dependency on HeadMountedDisplay in MyProject.Build.cs is not automatically propagated
@@ -140,6 +138,9 @@ void AMyProjectCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	SpawnNewToy();
+
+	GameMode = Cast<AMyProjectGameMode>(GetWorld()->GetAuthGameMode());
+	GameMode->OnToyDestroyed.AddDynamic(this, &AMyProjectCharacter::OnToyDestroyed);
 }
 
 void AMyProjectCharacter::TurnAtRate(float Rate)

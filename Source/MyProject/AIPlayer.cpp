@@ -1,19 +1,12 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "AIPlayer.h"
 #include <Kismet/KismetMathLibrary.h>
+#include "MyProjectGameMode.h"
 
-
-// Sets default values
 AAIPlayer::AAIPlayer()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-	
 }
 
-// Called when the game starts or when spawned
 void AAIPlayer::BeginPlay()
 {
 	Super::BeginPlay();
@@ -21,29 +14,31 @@ void AAIPlayer::BeginPlay()
 	{
 		Speed = FMath::RandRange(100, 300);
 	}
-	character = (AMyProjectCharacter*)UGameplayStatics::GetActorOfClass(GetWorld(), AMyProjectCharacter::StaticClass());
-	TArray<AActor*> allAIPlayers;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AAIPlayer::StaticClass(), allAIPlayers);
-	for (AActor* item : allAIPlayers)
-	{
-		AAIPlayer* aiPlayer = Cast<AAIPlayer>(item);
-		if (aiPlayer != this) otherPlayers.Add(aiPlayer);
-	}
+	AMyProjectGameMode* GameMode = Cast<AMyProjectGameMode>(GetWorld()->GetAuthGameMode());
+	GameMode->OnToyAvailable.AddDynamic(this, &AAIPlayer::OnToyAvailable);
 }
 
-float AAIPlayer::GetTimeToTarget()
+float AAIPlayer::GetTimeToTarget(AActor* target)
 {
-	if (character != nullptr && character->CurrentToy != nullptr)
-	{
-		FVector direction = character->CurrentToy->GetActorLocation() - GetActorLocation();
-		return direction.Size() / Speed;
-	}
-	return 0.f;
+	if (!IsValid(target)) return FLT_MAX;
+	FVector direction = target->GetActorLocation() - GetActorLocation();
+	return direction.Size() / Speed;
+}
+
+void AAIPlayer::SetCharacter(AActor* character)
+{
+	currentCharacter = character;
+}
+
+void AAIPlayer::SetMovementLock(bool state)
+{
+	movementLocked = state;
 }
 
 void AAIPlayer::MoveToTarget(float DeltaTime)
 {
-	FVector direction = character->CurrentToy->GetActorLocation() - GetActorLocation();
+	if (!IsValid(currentToy)) return;
+	FVector direction = currentToy->GetActorLocation() - GetActorLocation();
 	direction.Z = 0;
 	direction.Normalize();
 	SetActorLocation(GetActorLocation() + direction * DeltaTime * Speed);
@@ -54,43 +49,28 @@ void AAIPlayer::MoveToTarget(float DeltaTime)
 
 void AAIPlayer::LookToPlayer()
 {
-	FVector direction = character->GetActorLocation() - GetActorLocation();
+	if (!IsValid(currentCharacter)) return;
+	FVector direction = currentCharacter->GetActorLocation() - GetActorLocation();
 	direction.Z = 0;
 	FRotator rotator = UKismetMathLibrary::MakeRotFromX(direction);
 	SetActorRotation(rotator);
 }
 
-// Called every frame
+void AAIPlayer::OnToyAvailable(AActor* toy)
+{
+	currentToy = toy;
+}
+
 void AAIPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	if (character != nullptr)
+	if (movementLocked || !IsValid(currentToy))
 	{
-		if (character->CurrentToy != nullptr && character->CurrentToy->State == EState::Available)
-		{
-			float maxTime = 0;
-			for (AAIPlayer* item : otherPlayers)
-			{
-				if (item == nullptr) continue;
-				float otherTime = item->GetTimeToTarget();
-				if (maxTime < otherTime)
-				{
-					maxTime = otherTime;
-				}
-			}
-			if (GetTimeToTarget() >= maxTime)
-			{
-				LookToPlayer();
-			}
-			else
-			{
-				MoveToTarget(DeltaTime);
-			}
-		}
-		else
-		{
-			LookToPlayer();
-		}
+		LookToPlayer();
+	}
+	else
+	{
+		MoveToTarget(DeltaTime);
 	}
 }
 

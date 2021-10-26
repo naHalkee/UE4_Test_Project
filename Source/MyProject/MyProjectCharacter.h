@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Target.h"
+#include "MyProjectGameMode.h"
 #include "MyProjectCharacter.generated.h"
 
 UCLASS(config=Game)
@@ -47,6 +48,12 @@ public:
 
 protected:
 
+	UPROPERTY()
+		AMyProjectGameMode* GameMode;
+
+	UFUNCTION()
+		void OnToyDestroyed();
+
 	/** Resets HMD orientation in VR. */
 	void OnResetVR();
 
@@ -88,7 +95,5 @@ public:
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-
-	virtual void Tick(float DeltaTime) override;
 };
 
